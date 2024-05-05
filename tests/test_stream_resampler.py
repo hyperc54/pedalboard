@@ -36,6 +36,7 @@ TOLERANCE_PER_QUALITY = {
 @pytest.mark.parametrize("buffer_size", [4, 256, 8192, 1_000_000])
 @pytest.mark.parametrize("num_channels", [1, 2])
 @pytest.mark.parametrize("quality", TOLERANCE_PER_QUALITY.keys())
+@pytest.mark.parametrize("num_seconds", [1.0, 1.23])
 def test_stream_resample(
     fundamental_hz: float,
     sample_rate: float,
@@ -43,18 +44,19 @@ def test_stream_resample(
     buffer_size: int,
     num_channels: int,
     quality: Resample.Quality,
+    num_seconds: float
 ):
     sine_wave = generate_sine_at(
         sample_rate,
         fundamental_hz,
         num_channels=num_channels,
-        num_seconds=1,
+        num_seconds=num_seconds,
     ).astype(np.float32)
     expected_sine_wave = generate_sine_at(
         target_sample_rate,
         fundamental_hz,
         num_channels=num_channels,
-        num_seconds=1,
+        num_seconds=num_seconds,
     ).astype(np.float32)
     if num_channels == 1:
         sine_wave = np.expand_dims(sine_wave, 0)
@@ -69,8 +71,12 @@ def test_stream_resample(
     outputs.append(resampler.process(None))
     output = np.concatenate(outputs, axis=1)
 
-    num_samples = min(output.shape[1], expected_sine_wave.shape[1])
+    # In case we have a round number of input and output samples,
+    # we check that the number of output samples is as expected
+    if (num_seconds * sample_rate).is_integer() and (num_seconds * target_sample_rate).is_integer():
+        assert output.shape[1] == expected_sine_wave.shape[1]
 
+    num_samples = min(output.shape[1], expected_sine_wave.shape[1])
     np.testing.assert_allclose(
         expected_sine_wave[:, :num_samples],
         output[:, :num_samples],
@@ -166,7 +172,7 @@ def test_flush(sample_rate: float, target_sample_rate: float, quality: Resample.
 @pytest.mark.parametrize("target_sample_rate", [123.45, 8000, 11025, 12345.67, 22050, 44100, 48000])
 @pytest.mark.parametrize("chunk_size", [1, 4, 256, 8192, 1_000_000])
 @pytest.mark.parametrize("quality", TOLERANCE_PER_QUALITY.keys())
-def test_returned_sample_count(
+def test_returned_sample_count_from_chunks(
     sample_rate: float, target_sample_rate: float, chunk_size: int, quality
 ) -> np.ndarray:
     input_signal = np.linspace(0, sample_rate, 3, dtype=np.float32)

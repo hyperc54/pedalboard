@@ -94,7 +94,7 @@ public:
       length -= (std::round(resampler.getOutputLatency()) -
                  resampler.getOutputLatency());
     }
-    return (long)length;
+    return (long)std::round(length);
   }
 
   double getDuration() const {
@@ -200,9 +200,12 @@ public:
     }
 
     long long inputSamplesRequired =
-        (long long)(((numSamples - samplesToPullFromOutputBuffer) *
+        std::min(
+          (long long)(((numSamples - samplesToPullFromOutputBuffer) *
                      audioFile->getSampleRateAsDouble()) /
-                    resampler.getTargetSampleRate());
+                    resampler.getTargetSampleRate()),
+                    (long long)audioFile->getLengthInSamples()
+                    );
 
     // Make a juce::AudioBuffer that contains contiguous memory,
     // which we can pass to readInternal:
